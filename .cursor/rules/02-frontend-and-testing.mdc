@@ -1,0 +1,50 @@
+---
+description: FSD architecture, TanStack Router, TanStack Query, shadcn/ui, dark mode, and testing standards
+globs: apps/web/**/*, **/*.test.ts, **/*.test.tsx
+alwaysApply: false
+---
+
+# Frontend (FSD) & Testing Guidelines
+
+## Feature-Sliced Design (FSD) Rules
+
+`apps/web/src/` follows Feature-Sliced Design with six layers (top to bottom):
+`app` -> `pages` -> `widgets` -> `features` -> `entities` -> `shared`
+
+1. **Strict downward imports only:** A layer may only import from layers strictly below it. Never import upward (e.g., `entities` cannot import from `features`; `features` cannot import from `widgets` or `app`).
+2. **No cross-slice imports on the same layer:** Slices within `pages`, `widgets`, `features`, or `entities` must not import from sibling slices on the same layer. Compose them in a higher layer instead.
+3. **Public API (`index.ts`) enforcement:** Every slice in `pages/`, `widgets/`, `features/`, and `entities/` must expose exports via `index.ts`. External consumers must import from `@/entities/product`, never `@/entities/product/ui/ProductCard`.
+4. **No `src/components/` folder:** Reusable domain-agnostic UI primitives live in `src/shared/ui/` (shadcn/ui). Domain UI belongs in `entities/`, interactive user flows in `features/`, and composite layout blocks in `widgets/`.
+
+## TanStack Router (File-Based Routing inside `app/routes`)
+
+- Configure `@tanstack/router-plugin/vite` **BEFORE** `@vitejs/plugin-react` in `apps/web/vite.config.ts` with `routesDirectory: './src/app/routes'` and `generatedRouteTree: './src/app/routeTree.gen.ts'`.
+- Keep files in `src/app/routes/` thin: route definition, `validateSearch` (Zod), and rendering the corresponding page component imported from `@/pages/*`. Put page JSX and query hooks in `src/pages/*`.
+- Never manually edit `src/app/routeTree.gen.ts`.
+- Use `createRootRouteWithContext<{ queryClient: QueryClient }>()` in `src/app/routes/__root.tsx` and register the router type via `declare module '@tanstack/react-router'`.
+- Use `@tanstack/react-router` APIs (`<Link>`, `useNavigate`, `useParams`, `useSearch`) — never `react-router-dom`.
+
+## TanStack Query
+
+- Base HTTP client lives in `src/shared/api/client.ts` (targeting `import.meta.env.VITE_API_URL`, defaulting to `/api`).
+- Entity read queries (`queryOptions(...)`) live in `src/entities/<entity>/api/queries.ts`.
+- Feature mutations (`useMutation`) live in `src/features/<feature>/api/`.
+- Handle loading (shadcn `Skeleton`), empty, and error states cleanly in every page.
+
+## shadcn/ui & Dark Theme (Tailwind CSS v4)
+
+- Global CSS lives in `src/app/styles/index.css` with `@import "tailwindcss";`, `@import "tw-animate-css";`, and `@custom-variant dark (&:where(.dark, .dark *));`.
+- `ThemeProvider` (`light | dark | system` persisted in `localStorage`) and `ModeToggle` live together in `src/features/toggle-theme/` so `app/` and `widgets/site-header` can both import them downward.
+- Include a small inline script in `apps/web/index.html` to apply `.dark` before React mounts to prevent theme flash on reload.
+
+## Acceptance Criteria Alignment
+
+- `pages/home` (`/`): renders 5 featured "top rated" product cards.
+- `pages/category` (`/categories/$slug`): renders separate "Top Rated" and "Additional Products" sections with zero duplicates. - `features/search-products` + `pages/search` (`/search?q=...`): header search form has an input and an explicit "Search" button; submitting navigates to `/search?q=<term>` and renders backend-filtered results. - `pages/product-detail` (`/products/$productId`) + `features/submit-enquiry`: product details + "Enquire" button opening the enquiry dialog/form; successful submission displays a clear "Thank you" confirmation message.
+
+## Testing Rules
+
+- Never make live network calls to Fake Store API or external SMTP servers in tests.
+- Backend unit tests: test `ProductService` and `EnquiryService` with in-memory fakes/spies.
+- Backend API integration tests: Supertest against Express app factory with injected fakes.
+- Frontend tests (Vitest + React Testing Library): wrap slices/pages under test in a fresh `QueryClientProvider` (`retry: false`) and mocked `@/shared/api` to verify category section split, search submission, theme toggle, and enquiry submission displaying the "Thank you" state.

@@ -1,0 +1,33 @@
+---
+description: Core monorepo architecture, Node 24 LTS, pnpm workspaces, strict boundaries, and TypeScript standards
+alwaysApply: true
+---
+
+# Architecture & Engineering Standards
+
+This repository is an evolvable Product Catalogue foundation built with **Node 24 LTS** and **pnpm workspaces** (`pnpm-workspace.yaml`):
+
+- `packages/shared`: Shared Zod schemas and TypeScript DTOs (`@product-catalogue/shared`).
+- `apps/api`: Node.js 24 + Express + TypeScript backend following a Ports & Adapters structure.
+- `apps/web`: React 19 + Vite + TypeScript + FSD + TanStack Router + TanStack Query + Tailwind CSS v4 + shadcn/ui.
+
+## Non-Negotiable Boundaries
+
+1. **Never call external product APIs (Fake Store API) from `apps/web`.** All product data must flow through `apps/api`.
+2. **Isolate external providers behind interfaces (`apps/api/src/ports/`):**
+   - `ProductRepository`: Abstracts the product data source. Map raw Fake Store payloads into our internal `Product` domain model inside `FakeStoreProductRepository`. Never leak raw upstream fields (`rating.rate`) outside the adapter.
+   - `EmailProvider`: Abstracts outbound email delivery (`SmtpEmailProvider` for Mailpit/SMTP, swappable to AWS SES).
+3. **Keep business logic out of HTTP routes and React UI primitives:**
+   - Express routes only parse/validate input, invoke services, and serialize HTTP responses.
+   - Ranking, category partitioning, search filtering, and enquiry orchestration live in `apps/api/src/services/`.
+4. **Swappable Look & Feel + Dark Theme:**
+   - All UI primitives live in `apps/web/src/shared/ui/` (shadcn/ui).
+   - Never hardcode raw hex or Tailwind palette colors (`bg-gray-900`, `text-slate-600`) in slices. Always use semantic shadcn tokens (`bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`, `border-border`, `bg-primary`) defined in `apps/web/src/app/styles/index.css` (`:root` and `.dark`).
+
+## Tooling & Code Quality
+
+- Target Node 24 LTS (`node:24-alpine` in Dockerfiles, native `fetch` and `AbortSignal.timeout`).
+- Use `pnpm` exclusively (`pnpm-workspace.yaml`, `pnpm-lock.yaml`, `"workspace:*"` for internal packages). Never create `package-lock.json` or `yarn.lock`.
+- In Dockerfiles, install pnpm 12 via `COPY --from=ghcr.io/pnpm/pnpm:12-alpine /opt/pnpm /opt/pnpm` and symlink `pnpm`/`pnpx` into `/usr/local/bin` rather than using `corepack enable`.
+- Strict TypeScript everywhere. Never use `any`; use `unknown` and narrow with Zod or type guards.
+- Never commit secrets or `.env` files. Document all env vars in `.env.example` and validate backend config on startup via Zod in `apps/api/src/config.ts`.
