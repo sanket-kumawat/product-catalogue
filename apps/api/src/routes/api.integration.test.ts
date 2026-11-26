@@ -9,6 +9,7 @@ import {
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FakeStoreProductRepository } from '../adapters/fake-store/fake-store-product-repository.js';
 import { createApp } from '../app.js';
 import { loadConfig } from '../config.js';
 import type { ProductRepository } from '../ports/product-repository.js';
@@ -189,6 +190,32 @@ describe('product read API', () => {
     });
     expect(JSON.stringify(response.body)).not.toContain('boom secret');
     errorSpy.mockRestore();
+  });
+
+  it('returns 503 when the product source is unavailable', async () => {
+    const products = new FakeStoreProductRepository({
+      baseUrl: 'https://fakestoreapi.com',
+      ttlMs: 300_000,
+      fetchFn: async () => {
+        throw new TypeError('network down');
+      },
+    });
+    const app = createApp({
+      products,
+      config: loadConfig({}),
+    });
+
+    const response = await request(app).get('/api/products/featured');
+
+    expect(response.status).toBe(503);
+    expect(ApiErrorSchema.parse(response.body)).toEqual({
+      error: {
+        code: 'UPSTREAM_UNAVAILABLE',
+        message: 'Product source is unavailable',
+      },
+    });
+    expect(JSON.stringify(response.body)).not.toContain('stack');
+    expect(JSON.stringify(response.body)).not.toContain('network down');
   });
 });
 
