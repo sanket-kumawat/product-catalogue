@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "prebuild": "pnpm --filter @product-catalogue/shared build",
     "build": "tsc -p tsconfig.json",
@@ -10,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "pretest": "pnpm --filter @product-catalogue/shared build",
     "test": "vitest run",
-    "dev": "node --watch src/index.ts",
+    "dev": "sh dev.sh",
     "start": "node dist/index.js"
   },
   "dependencies": {

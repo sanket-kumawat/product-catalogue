@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+dist
+.git
+coverage
+.vite
+**/.vite
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+PRD.pdf
