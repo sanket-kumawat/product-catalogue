@@ -5,47 +5,60 @@ import { categoryListQuery } from '@/entities/category';
 import { SearchForm } from '@/features/search-products';
 import { ModeToggle } from '@/features/toggle-theme';
 
+function capitalizeFirst(value: string): string {
+  const [first, ...rest] = value;
+  if (first === undefined) {
+    return value;
+  }
+  return first.toLocaleUpperCase() + rest.join('');
+}
+
 export function SiteHeader() {
   const categories = useQuery(categoryListQuery());
 
   return (
-    <header className='border-b border-border bg-background'>
-      <div className='mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3'>
-        <Link
-          to='/'
-          className='font-semibold text-foreground'
-        >
-          Catalogue
-        </Link>
-        <nav
-          aria-label='Categories'
-          className='order-3 flex basis-full flex-wrap gap-x-3 gap-y-2 text-sm sm:order-none sm:basis-auto sm:flex-1'
-        >
-          {categories.isPending ? (
-            <span className='text-muted-foreground'>Loading categories</span>
-          ) : null}
-          {categories.isError ? (
-            <span className='text-muted-foreground'>
-              Categories unavailable
-            </span>
-          ) : null}
-          {categories.data?.categories.map((category) => (
-            <Link
-              key={category.slug}
-              to='/categories/$slug'
-              params={{ slug: category.slug }}
-              className='text-muted-foreground'
-            >
-              {category.name}
-            </Link>
-          ))}
-        </nav>
-        <div className='order-4 basis-full sm:order-none sm:w-72'>
-          <SearchForm />
+    <header className='bg-background'>
+      <div className='border-b border-border'>
+        <div className='mx-auto flex max-w-5xl items-center gap-x-4 gap-y-2 px-4 py-3'>
+          <Link
+            to='/'
+            activeOptions={{ exact: true }}
+            activeProps={{ className: 'font-semibold text-foreground' }}
+            inactiveProps={{ className: 'text-muted-foreground' }}
+          >
+            Home
+          </Link>
+          <nav
+            aria-label='Categories'
+            className='flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 text-sm'
+          >
+            {categories.isPending ? (
+              <span className='text-muted-foreground'>Loading categories</span>
+            ) : null}
+            {categories.isError ? (
+              <span className='text-muted-foreground'>
+                Categories unavailable
+              </span>
+            ) : null}
+            {categories.data?.categories.map((category) => (
+              <Link
+                key={category.slug}
+                to='/categories/$slug'
+                params={{ slug: category.slug }}
+                activeProps={{ className: 'font-semibold text-foreground' }}
+                inactiveProps={{ className: 'text-muted-foreground' }}
+              >
+                {capitalizeFirst(category.name)}
+              </Link>
+            ))}
+          </nav>
+          <div className='shrink-0'>
+            <ModeToggle />
+          </div>
         </div>
-        <div className='ml-auto'>
-          <ModeToggle />
-        </div>
+      </div>
+      <div className='mx-auto max-w-5xl px-4 py-3'>
+        <SearchForm />
       </div>
     </header>
   );

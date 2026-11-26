@@ -57,6 +57,52 @@ describe('SearchPage', () => {
     ).toBeTruthy();
   });
 
+  it('restores the previous products when the search is cleared', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiGet).mockImplementation(async (path: string) => {
+      if (path.startsWith('/search')) {
+        return {
+          query: 'shirt',
+          products: [testProduct({ id: 3, title: 'Cotton shirt' })],
+        };
+      }
+      if (path.startsWith('/categories/')) {
+        return {
+          category: 'jewelery',
+          topRated: [
+            testProduct({ id: 1, title: 'Gold ring', category: 'jewelery' }),
+          ],
+          additional: [],
+        };
+      }
+      return { categories: [] };
+    });
+    await renderWithProviders('/categories/jewelery');
+
+    expect(await screen.findByRole('link', { name: 'Gold ring' })).toBeTruthy();
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search products' }),
+      'shirt',
+    );
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(
+      await screen.findByRole('link', { name: 'Cotton shirt' }),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'jewelery' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Gold ring' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Search' })).toBeNull();
+    expect(
+      screen.getByRole('searchbox', { name: 'Search products' }),
+    ).toHaveProperty('value', '');
+  });
+
   it('renders the empty search result', async () => {
     await renderWithProviders('/search?q=zzz');
 
