@@ -1,0 +1,26 @@
+---
+description: Backend API conventions, error handling, resilience, and security basics
+globs: apps/api/**/*.ts
+alwaysApply: false
+---
+
+# Backend & Security Guidelines
+
+## Validation & Error Handling
+
+- Validate all request params, query strings, and JSON bodies using shared Zod schemas from `@product-catalogue/shared`.
+- Route all errors to a centralized Express error middleware returning consistent JSON (`{ error: { code, message, details? } }`) without leaking stack traces in production.
+- Return `404` when a requested product ID or category does not exist, `400` for validation errors, and `502`/`503` if the upstream product source is unreachable.
+
+## Upstream Resilience (Fake Store Adapter)
+
+- Always apply an explicit timeout (`AbortSignal.timeout(5000)`) on upstream HTTP calls.
+- Cache fetched products in memory with a configurable TTL (default 5 minutes) to reduce latency and upstream dependency.
+- Handle URL-encoded category slugs cleanly (e.g., `men's clothing`, `women's clothing`).
+
+## Security & Email Safety
+
+- Enable `helmet`, scoped `cors` (using `CORS_ORIGIN`), and `express.json({ limit: '16kb' })`.
+- Apply rate limiting (`express-rate-limit`) to `POST /api/enquiries` to prevent spam abuse.
+- Always HTML-escape all user-supplied fields (`name`, `email`, `phone`, `message`) before rendering HTML email templates, and include a plain-text fallback body.
+- Validate `productId` against `ProductRepository` before sending an enquiry email so enquiries always reference a real product.
