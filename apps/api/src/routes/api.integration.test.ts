@@ -2,6 +2,7 @@ import {
   ApiErrorSchema,
   CategoryListResponseSchema,
   CategoryProductsResponseSchema,
+  EnquirySuccessResponseSchema,
   FeaturedProductsResponseSchema,
   ProductResponseSchema,
   SearchResponseSchema,
@@ -12,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeStoreProductRepository } from '../adapters/fake-store/fake-store-product-repository.js';
 import { createApp } from '../app.js';
 import { loadConfig } from '../config.js';
+import type { EmailMessage, EmailProvider } from '../ports/email-provider.js';
 import type { ProductRepository } from '../ports/product-repository.js';
 import { InMemoryProductRepository } from '../test/in-memory-product-repository.js';
 import { makeProduct } from '../test/products.js';
@@ -67,10 +69,22 @@ const catalog = [
   }),
 ];
 
-function appWith(featuredProductIds = '') {
+const discardEmail: EmailProvider = {
+  async send() {},
+};
+
+function appWith(
+  featuredProductIds = '',
+  rateLimitMax = '10',
+  email: EmailProvider = discardEmail,
+) {
   return createApp({
     products: new InMemoryProductRepository(catalog),
-    config: loadConfig({ FEATURED_PRODUCT_IDS: featuredProductIds }),
+    email,
+    config: loadConfig({
+      FEATURED_PRODUCT_IDS: featuredProductIds,
+      ENQUIRY_RATE_LIMIT_MAX: rateLimitMax,
+    }),
   });
 }
 
@@ -179,6 +193,7 @@ describe('product read API', () => {
     };
     const app = createApp({
       products,
+      email: discardEmail,
       config: loadConfig({}),
     });
 
@@ -202,6 +217,7 @@ describe('product read API', () => {
     });
     const app = createApp({
       products,
+      email: discardEmail,
       config: loadConfig({}),
     });
 
@@ -216,6 +232,111 @@ describe('product read API', () => {
     });
     expect(JSON.stringify(response.body)).not.toContain('stack');
     expect(JSON.stringify(response.body)).not.toContain('network down');
+  });
+});
+
+describe('POST /api/enquiries', () => {
+  const validEnquiry = {
+    productId: 1,
+    name: 'Ada Lovelace',
+    email: 'ada@example.com',
+    message: 'I would like this jacket.',
+  };
+
+  it('returns 201 and sends one email for a real product', async () => {
+    const sent: EmailMessage[] = [];
+    const email: EmailProvider = {
+      async send(message) {
+        sent.push(message);
+      },
+    };
+    const app = appWith('', '10', email);
+
+    const response = await request(app)
+      .post('/api/enquiries')
+      .send(validEnquiry);
+
+    expect(response.status).toBe(201);
+    expect(EnquirySuccessResponseSchema.parse(response.body)).toEqual({
+      message: 'Thank you',
+    });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      to: 'sales@product-catalogue.local',
+      from: 'no-reply@product-catalogue.local',
+      replyTo: 'ada@example.com',
+      subject: 'Enquiry: Alpha Shirt',
+    });
+  });
+
+  it('returns 400 for an invalid enquiry and 404 without sending when the product is missing', async () => {
+    const sent: EmailMessage[] = [];
+    const email: EmailProvider = {
+      async send(message) {
+        sent.push(message);
+      },
+    };
+    const app = appWith('', '10', email);
+
+    const invalid = await request(app)
+      .post('/api/enquiries')
+      .send({ productId: 1 });
+    expect(invalid.status).toBe(400);
+    expect(ApiErrorSchema.parse(invalid.body).error).toMatchObject({
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid enquiry',
+    });
+    expect(invalid.body.error.details).toBeDefined();
+
+    const missing = await request(app)
+      .post('/api/enquiries')
+      .send({ ...validEnquiry, productId: 999 });
+    expect(missing.status).toBe(404);
+    expect(ApiErrorSchema.parse(missing.body).error).toEqual({
+      code: 'NOT_FOUND',
+      message: 'Product 999 not found',
+    });
+    expect(sent).toEqual([]);
+  });
+
+  it('returns 429 after the configured enquiry limit', async () => {
+    const sent: EmailMessage[] = [];
+    const email: EmailProvider = {
+      async send(message) {
+        sent.push(message);
+      },
+    };
+    const app = appWith('', '2', email);
+
+    expect(
+      (await request(app).post('/api/enquiries').send(validEnquiry)).status,
+    ).toBe(201);
+    expect(
+      (await request(app).post('/api/enquiries').send(validEnquiry)).status,
+    ).toBe(201);
+    const limited = await request(app)
+      .post('/api/enquiries')
+      .send(validEnquiry);
+
+    expect(limited.status).toBe(429);
+    expect(ApiErrorSchema.parse(limited.body).error).toEqual({
+      code: 'RATE_LIMITED',
+      message: 'Too many enquiries. Try again later.',
+    });
+    expect(sent).toHaveLength(2);
+  });
+
+  it('returns 400 for invalid JSON', async () => {
+    const response = await request(appWith())
+      .post('/api/enquiries')
+      .set('Content-Type', 'application/json')
+      .send('{');
+
+    expect(response.status).toBe(400);
+    expect(ApiErrorSchema.parse(response.body).error).toEqual({
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid JSON',
+    });
   });
 });
 

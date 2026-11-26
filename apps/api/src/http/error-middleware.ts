@@ -34,6 +34,28 @@ export const errorMiddleware: ErrorRequestHandler = (
     return;
   }
 
+  const bodyError = readBodyParserError(error);
+  if (bodyError === 'entity.parse.failed') {
+    const body: ApiErrorBody = {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid JSON',
+      },
+    };
+    res.status(400).json(body);
+    return;
+  }
+  if (bodyError === 'entity.too.large') {
+    const body: ApiErrorBody = {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Request body is too large',
+      },
+    };
+    res.status(413).json(body);
+    return;
+  }
+
   console.error(error);
   const body: ApiErrorBody = {
     error: {
@@ -43,3 +65,11 @@ export const errorMiddleware: ErrorRequestHandler = (
   };
   res.status(500).json(body);
 };
+
+function readBodyParserError(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('type' in error)) {
+    return undefined;
+  }
+  const type = error.type;
+  return typeof type === 'string' ? type : undefined;
+}
