@@ -1,3 +1,13 @@
+export class ApiRequestError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`Request failed with status ${status}`);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
 function apiBase(): string {
   const configured = import.meta.env.VITE_API_URL;
   if (typeof configured === 'string' && configured.length > 0) {
@@ -6,13 +16,28 @@ function apiBase(): string {
   return '/api';
 }
 
-export async function apiGet(path: string): Promise<unknown> {
+async function request(path: string, init?: RequestInit): Promise<unknown> {
+  const headers = new Headers(init?.headers);
+  headers.set('accept', 'application/json');
   const response = await fetch(`${apiBase()}${path}`, {
-    headers: { accept: 'application/json' },
+    ...init,
+    headers,
   });
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw new ApiRequestError(response.status);
   }
   const body: unknown = await response.json();
   return body;
+}
+
+export function apiGet(path: string): Promise<unknown> {
+  return request(path);
+}
+
+export function apiPost(path: string, body: unknown): Promise<unknown> {
+  return request(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }

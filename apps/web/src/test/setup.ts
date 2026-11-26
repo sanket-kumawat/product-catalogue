@@ -1,3 +1,4 @@
+import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 Object.defineProperty(window, 'scrollTo', {
@@ -20,6 +21,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 afterEach(() => {
+  cleanup();
   localStorage.clear();
   document.documentElement.classList.remove('dark');
 });

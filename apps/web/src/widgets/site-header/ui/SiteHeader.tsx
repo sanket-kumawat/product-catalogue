@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
 import { categoryListQuery } from '@/entities/category';
+import { SearchForm } from '@/features/search-products';
 import { ModeToggle } from '@/features/toggle-theme';
 
 export function SiteHeader() {
@@ -18,7 +19,7 @@ export function SiteHeader() {
         </Link>
         <nav
           aria-label='Categories'
-          className='order-last flex basis-full flex-wrap gap-x-3 gap-y-2 text-sm sm:order-none sm:basis-auto sm:flex-1'
+          className='order-3 flex basis-full flex-wrap gap-x-3 gap-y-2 text-sm sm:order-none sm:basis-auto sm:flex-1'
         >
           {categories.isPending ? (
             <span className='text-muted-foreground'>Loading categories</span>
@@ -39,6 +40,9 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
+        <div className='order-4 basis-full sm:order-none sm:w-72'>
+          <SearchForm />
+        </div>
         <div className='ml-auto'>
           <ModeToggle />
         </div>

@@ -5,7 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 
 vi.mock('@/shared/api/client', () => ({
-  apiGet: vi.fn(async () => ({ categories: [] })),
+  apiGet: vi.fn(async (path: string) => {
+    if (path === '/products/featured') {
+      return { products: [] };
+    }
+    return { categories: [] };
+  }),
+  apiPost: vi.fn(),
 }));
 
 describe('ModeToggle', () => {
